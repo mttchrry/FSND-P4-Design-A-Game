@@ -2,10 +2,12 @@
 entities used by the Game. Because these classes are also regular Python
 classes they can include methods (such as 'to_form' and 'new_game')."""
 
+import logging
 import random
 from datetime import date
 from protorpc import messages
 from google.appengine.ext import ndb
+
 
 
 class User(ndb.Model):
@@ -13,9 +15,12 @@ class User(ndb.Model):
     name = ndb.StringProperty(required=True)
     email =ndb.StringProperty()
 
+class Row(ndb.Model):
+    row = ndb.IntegerProperty(repeated=True)
 
 class Game(ndb.Model):
     """Game object"""
+    gamegrid = ndb.LocalStructuredProperty(Row, repeated=True)
     target = ndb.IntegerProperty(required=True)
     attempts_allowed = ndb.IntegerProperty(required=True)
     attempts_remaining = ndb.IntegerProperty(required=True, default=5)
@@ -27,11 +32,31 @@ class Game(ndb.Model):
         """Creates and returns a new game"""
         if max < min:
             raise ValueError('Maximum must be greater than minimum')
+
+        """gamearray = [[0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0]]"""
+        emptyRow = Row(row=[0,0,0,0,0,0,0])
+        grid = [emptyRow,
+                emptyRow,
+                emptyRow,
+                emptyRow,
+                emptyRow,
+                emptyRow,
+                emptyRow]
+        logging.error("here we've made a grid")
+        logging.error(grid)
         game = Game(user=user,
+                    gamegrid = grid,
                     target=random.choice(range(1, max + 1)),
                     attempts_allowed=attempts,
                     attempts_remaining=attempts,
                     game_over=False)
+        logging.error(game.gamegrid)
         game.put()
         return game
 

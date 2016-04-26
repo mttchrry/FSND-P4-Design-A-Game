@@ -28,7 +28,7 @@ USER_REQUEST = endpoints.ResourceContainer(user_name=messages.StringField(1),
 MEMCACHE_MOVES_REMAINING = 'MOVES_REMAINING'
 
 @endpoints.api(name='guess_a_number', version='v1')
-class GuessANumberApi(remote.Service):
+class Connect4Api(remote.Service):
     """Game API"""
     @endpoints.method(request_message=USER_REQUEST,
                       response_message=StringMessage,
@@ -153,4 +153,4 @@ class GuessANumberApi(remote.Service):
                          'The average moves remaining is {:.2f}'.format(average))
 
 
-api = endpoints.api_server([GuessANumberApi])
+api = endpoints.api_server([Connect4Api])
