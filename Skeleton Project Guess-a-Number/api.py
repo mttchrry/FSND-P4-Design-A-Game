@@ -27,7 +27,7 @@ USER_REQUEST = endpoints.ResourceContainer(user_name=messages.StringField(1),
 
 MEMCACHE_MOVES_REMAINING = 'MOVES_REMAINING'
 
-@endpoints.api(name='guess_a_number', version='v1')
+@endpoints.api(name='connect_four', version='v1')
 class Connect4Api(remote.Service):
     """Game API"""
     @endpoints.method(request_message=USER_REQUEST,
@@ -52,12 +52,13 @@ class Connect4Api(remote.Service):
                       http_method='POST')
     def new_game(self, request):
         """Creates new game"""
-        user = User.query(User.name == request.user_name).get()
-        if not user:
+        user1 = User.query(User.name == request.user_1).get()
+        user2 = User.query(User.name == request.user_2).get()
+        if not user1 or not user2:
             raise endpoints.NotFoundException(
-                    'A User with that name does not exist!')
+                    'A Users with those name do not exist!')
         try:
-            game = Game.new_game(user.key, request.min,
+            game = Game.new_game(user1.key, user2.key, request.min,
                                  request.max, request.attempts)
         except ValueError:
             raise endpoints.BadRequestException('Maximum must be greater '
@@ -67,7 +68,7 @@ class Connect4Api(remote.Service):
         # This operation is not needed to complete the creation of a new game
         # so it is performed out of sequence.
         taskqueue.add(url='/tasks/cache_average_attempts')
-        return game.to_form('Good luck playing Guess a Number!')
+        return game.to_form('Good luck playing Connect Four! Player {0} goes first'.format(user1.name))
 
     @endpoints.method(request_message=GET_GAME_REQUEST,
                       response_message=GameForm,
@@ -93,22 +94,76 @@ class Connect4Api(remote.Service):
         if game.game_over:
             return game.to_form('Game already over!')
 
-        game.attempts_remaining -= 1
-        if request.guess == game.target:
-            game.end_game(True)
-            return game.to_form('You win!')
+        user = User.query(User.name == request.user).get()
+        if not user:
+            raise endpoints.NotFoundException(
+                    'A Users with those name do not exist!')
+        # handle all incorrect turn attempts or users not in the game
+        if game.player_1_turn and user.key != game.user1:
+            if user.key != game.user2:
+                raise endpoints.NotFoundException(
+                    'User not in this game')
+            else:
+                raise endpoints.NotFoundException(
+                    'Not your turn')
+        elif not game.player_1_turn and user.key != game.user2:
+            if user.key != game.user1:
+                raise endpoints.NotFoundException(
+                    'User not in this game')
+            else:
+                raise endpoints.NotFoundException(
+                    'Not your turn')
 
-        if request.guess < game.target:
-            msg = 'Too low!'
-        else:
-            msg = 'Too high!'
+        # Make sure user picked a valid column.
+        if request.column < 0 or request.column > 6:
+            raise endpoints.NotFoundException(
+                    'Must select a column between 0 and 6')
 
-        if game.attempts_remaining < 1:
-            game.end_game(False)
-            return game.to_form(msg + ' Game over!')
+        # player 1 chip is 1, player 2 chip is 2.
+        playerChip = 0
+        if game.player_1_turn:
+            playerChip = 1
         else:
-            game.put()
-            return game.to_form(msg)
+            playerChip = 2
+
+        logging.error(request.column)
+        for idx, val in enumerate(game.gamegrid[request.column].row):
+          if val == 0:
+            game.gamegrid[request.column].row[idx] = playerChip
+            break
+          elif idx == 6:
+            raise endpoints.NotFoundException(
+                    'column is already full, pick another')
+        if game.has_last_chip_won(request.column, endpoints):
+            game_over = True
+            game_winner = user.key
+            game_score = 1 #still need to calculate, based on number of empty spaces
+
+        game.player_1_turn = not game.player_1_turn
+
+        if game.player_1_turn:
+            msg = 'Player {0} is up next'.format(game.user1)
+        else:
+            msg = 'Player {0} is up next'.format(game.user2)
+
+
+
+        #game.attempts_remaining -= 1
+        #if request.guess == game.target:
+        #    game.end_game(True)
+        #    return game.to_form('You win!')
+
+#        if request.guess < game.target:
+#            msg = 'Too low!'
+#        else:
+#            msg = 'Too high!'
+
+#        if game.attempts_remaining < 1:
+#            game.end_game(False)
+#            return game.to_form(msg + ' Game over!')
+#        else:
+        game.put()
+        return game.to_form(msg)
 
     @endpoints.method(response_message=ScoreForms,
                       path='scores',
@@ -151,6 +206,7 @@ class Connect4Api(remote.Service):
             average = float(total_attempts_remaining)/count
             memcache.set(MEMCACHE_MOVES_REMAINING,
                          'The average moves remaining is {:.2f}'.format(average))
+
 
 
 api = endpoints.api_server([Connect4Api])
