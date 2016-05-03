@@ -125,15 +125,15 @@ class Game(ndb.Model):
             raise endpoints.NotFoundException(
                   'Wrong chip on this column, could not have been winner 3')
 
-        # Check for 3 more to the upper left
+        # Check for 3 more in the -45 degree direction
         if self.check_win_direction(column, lastUsedIndex, -1, 1, 3, chipval):
           return True;
 
-        # Check for 3 more to the left
+        # Check for 3 more on the y plane
         if self.check_win_direction(column, lastUsedIndex, -1, 0, 3, chipval):
           return True;
         
-        # Check for 3 more to the lower left
+        # Check for 3 more to the 45 degree direction
         if self.check_win_direction(column, lastUsedIndex, -1, -1, 3, chipval):
           return True;
         
@@ -142,18 +142,19 @@ class Game(ndb.Model):
           return True;
       
         # Check for 3 more to the lower right
-        if self.check_win_direction(column, lastUsedIndex, 1, -1, 3, chipval):
-          return True;
+        #if self.check_win_direction(column, lastUsedIndex, 1, -1, 3, chipval):
+        #  return True;
     
         # Check for 3 more to the right
-        if self.check_win_direction(column, lastUsedIndex, 1, 0, 3, chipval):
-          return True;
+        #if self.check_win_direction(column, lastUsedIndex, 1, 0, 3, chipval):
+        #  return True;
   
         # Check for 3 more to the upper right
-        if self.check_win_direction(column, lastUsedIndex, 1, 1, 3, chipval):
-          return True;
+        #if self.check_win_direction(column, lastUsedIndex, 1, 1, 3, chipval):
+        #  return True;
     
-    def check_win_direction(self, x, y, dx, dy, numberLeft, player):
+    def check_win_direction(self, x, y, dx, dy, numberLeft, player, alreadyreversed=False):
+        logging.error(str(x)+ '_'+str(dx) +',' + str(y)+'_'+str(dy)+', '+str(numberLeft)+ '_'+str(player) + 'A? '+ str(alreadyreversed))
         if x+dx < 0 or x + dx > 6 or y+dy < 0 or y + dy > 6:
             return False
         if self.gamegrid[x + dx].row[y+dy] == player:
@@ -161,9 +162,14 @@ class Game(ndb.Model):
                 return True
             else:
                 numberLeft -= 1
-                return self.check_win_direction(x+dx,y+dy,dx,dy,numberLeft,player)
+                return self.check_win_direction(x+dx,y+dy,dx,dy,numberLeft,player,alreadyreversed)
+        elif alreadyreversed == False:
+            alreadyreversed = True
+            numberGone = 3-numberLeft
+            return self.check_win_direction(x-(dx*numberGone),y-(dy*numberGone),-dx,-dy,numberLeft,player,alreadyreversed)
         else:
             return False
+
 
 
 class Score(ndb.Model):
