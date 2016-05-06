@@ -135,33 +135,14 @@ class Connect4Api(remote.Service):
             raise endpoints.NotFoundException(
                     'column is already full, pick another')
         if game.has_last_chip_won(request.column, endpoints):
-            game.game_over = True
-            game.game_winner = user.key
-            game.game_score = 1 #still need to calculate, based on number of empty spaces
-
+            game.end_game(user.key, True)
+            
         game.player_1_turn = not game.player_1_turn
 
         if game.player_1_turn:
             msg = 'Player {0} is up next'.format(game.user1.get().name)
         else:
             msg = 'Player {0} is up next'.format(game.user2.get().name)
-
-
-
-        #game.attempts_remaining -= 1
-        #if request.guess == game.target:
-        #    game.end_game(True)
-        #    return game.to_form('You win!')
-
-#        if request.guess < game.target:
-#            msg = 'Too low!'
-#        else:
-#            msg = 'Too high!'
-
-#        if game.attempts_remaining < 1:
-#            game.end_game(False)
-#            return game.to_form(msg + ' Game over!')
-#        else:
         game.put()
         return game.to_form(msg)
 

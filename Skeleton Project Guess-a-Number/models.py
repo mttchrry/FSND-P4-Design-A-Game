@@ -87,14 +87,16 @@ class Game(ndb.Model):
             form.game_winner = self.game_winner.get().name
         return form
 
-    def end_game(self, won=False):
+    def end_game(self, winner=None, won=False):
         """Ends the game - if won is True, the player won. - if won is False,
         the player lost."""
         self.game_over = True
+        self.game_winner = winner
         self.put()
         # Add the game to the score 'board'
+        points = calc_points()
         score = Score(user=self.user, date=date.today(), won=won,
-                      guesses=self.attempts_allowed - self.attempts_remaining)
+                      points=points)
         score.put()
 
     def has_last_chip_won(self, column, endpoints):
@@ -129,7 +131,7 @@ class Game(ndb.Model):
         if self.check_win_direction(column, lastUsedIndex, -1, 1, 3, chipval):
           return True;
 
-        # Check for 3 more on the y plane
+        # Check for 3 more in the horizontal
         if self.check_win_direction(column, lastUsedIndex, -1, 0, 3, chipval):
           return True;
         
@@ -137,21 +139,9 @@ class Game(ndb.Model):
         if self.check_win_direction(column, lastUsedIndex, -1, -1, 3, chipval):
           return True;
         
-        # Check for 3 more below
+        # Check for 3 more vertically
         if self.check_win_direction(column, lastUsedIndex, 0, -1, 3, chipval):
           return True;
-      
-        # Check for 3 more to the lower right
-        #if self.check_win_direction(column, lastUsedIndex, 1, -1, 3, chipval):
-        #  return True;
-    
-        # Check for 3 more to the right
-        #if self.check_win_direction(column, lastUsedIndex, 1, 0, 3, chipval):
-        #  return True;
-  
-        # Check for 3 more to the upper right
-        #if self.check_win_direction(column, lastUsedIndex, 1, 1, 3, chipval):
-        #  return True;
     
     def check_win_direction(self, x, y, dx, dy, numberLeft, player, alreadyreversed=False):
         logging.error(str(x)+ '_'+str(dx) +',' + str(y)+'_'+str(dy)+', '+str(numberLeft)+ '_'+str(player) + 'A? '+ str(alreadyreversed))
@@ -170,6 +160,14 @@ class Game(ndb.Model):
         else:
             return False
 
+    def calc_points(self):
+        # score is the total number of chips not used in the game. 
+        score = 0
+        for aRow in self.gamegrid.row:
+            for item in aRow:
+                if item == 0:
+                    score += 1
+        return score
 
 
 class Score(ndb.Model):
@@ -177,11 +175,11 @@ class Score(ndb.Model):
     user = ndb.KeyProperty(required=True, kind='User')
     date = ndb.DateProperty(required=True)
     won = ndb.BooleanProperty(required=True)
-    guesses = ndb.IntegerProperty(required=True)
+    points = ndb.IntegerProperty(required=True)
 
     def to_form(self):
         return ScoreForm(user_name=self.user.get().name, won=self.won,
-                         date=str(self.date), guesses=self.guesses)
+                         date=str(self.date), points=self.points)
 
 
 class GameForm(messages.Message):
@@ -221,7 +219,7 @@ class ScoreForm(messages.Message):
     user_name = messages.StringField(1, required=True)
     date = messages.StringField(2, required=True)
     won = messages.BooleanField(3, required=True)
-    guesses = messages.IntegerField(4, required=True)
+    points = messages.IntegerField(4, required=True)
 
 
 class ScoreForms(messages.Message):
