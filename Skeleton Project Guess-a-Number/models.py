@@ -21,29 +21,17 @@ class Row(ndb.Model):
 class Game(ndb.Model):
     """Game object"""
     gamegrid = ndb.LocalStructuredProperty(Row, repeated=True)
-    target = ndb.IntegerProperty(required=True)
     game_score = ndb.IntegerProperty(required=True, default=0)
     game_winner = ndb.KeyProperty(kind='User')
-    attempts_allowed = ndb.IntegerProperty(required=True)
-    attempts_remaining = ndb.IntegerProperty(required=True, default=5)
     game_over = ndb.BooleanProperty(required=True, default=False)
     user1 = ndb.KeyProperty(required=True, kind='User')
     user2 = ndb.KeyProperty(required=True, kind='User')
     player_1_turn = ndb.BooleanProperty(required=True, default=True)
 
     @classmethod
-    def new_game(cls, user1, user2, min, max, attempts):
+    def new_game(cls, user1, user2):
         """Creates and returns a new game"""
-        if max < min:
-            raise ValueError('Maximum must be greater than minimum')
 
-        """gamearray = [[0,0,0,0,0,0,0],
-        [0,0,0,0,0,0,0],
-        [0,0,0,0,0,0,0],
-        [0,0,0,0,0,0,0],
-        [0,0,0,0,0,0,0],
-        [0,0,0,0,0,0,0],
-        [0,0,0,0,0,0,0]]"""
         emptyRow = Row(row=[0,0,0,0,0,0,0])
         grid = [emptyRow,
                 emptyRow,
@@ -55,10 +43,12 @@ class Game(ndb.Model):
         game = Game(user1=user1,
                     user2=user2,
                     gamegrid = grid,
-                    target=random.choice(range(1, max + 1)),
-                    attempts_allowed=attempts,
-                    attempts_remaining=attempts,
                     game_over=False)
+        #Get rid of, just for quick end game tests
+        game.gamegrid[0].row[0] = 1
+        game.gamegrid[0].row[1] = 1
+        game.gamegrid[0].row[2] = 1
+
         game.put()
         return game
 
@@ -68,7 +58,6 @@ class Game(ndb.Model):
         form.urlsafe_key = self.key.urlsafe()
         form.user1_name = self.user1.get().name
         form.user2_name = self.user2.get().name
-        form.attempts_remaining = self.attempts_remaining
         form.game_over = self.game_over
         form.message = message
         form.grid_row1 = self.gamegrid[0].row
@@ -92,23 +81,25 @@ class Game(ndb.Model):
         the player lost."""
         self.game_over = True
         self.game_winner = winner
+        loser = self.user1
+        if loser == winner:
+            loser = self.user2
         self.put()
         # Add the game to the score 'board'
-        points = calc_points()
-        score = Score(user=self.user, date=date.today(), won=won,
+        logging.error("did we get here?")
+        points = self.calc_points()
+        score = Score(winner=winner, loser=loser, date=date.today(), won=won,
                       points=points)
         score.put()
 
     def has_last_chip_won(self, column, endpoints):
         lastUsedIndex = 0
         chipval = 0
-        logging.warning("column is "+ str(column))
         # get the last chip put in the column
         for idx, chipval in enumerate(self.gamegrid[column].row):
-          logging.warning("real val is "+str(self.gamegrid[column].row[idx]))
+
           if chipval == 0:
             if idx == 0:
-                logging.error("stopped before we started")
                 raise endpoints.NotFoundException(
                   'no chip in this column, could not have been winner 1')
             lastUsedIndex = idx - 1
@@ -119,11 +110,9 @@ class Game(ndb.Model):
         chipval = self.gamegrid[column].row[lastUsedIndex]
         # if the last chip isn't the current players turn, we have a problem.
         if self.player_1_turn and chipval != 1:
-            logging.error(str(chipval) + " - the chipVal")
             raise endpoints.NotFoundException(
                   'Wrong chip on this column, could not have been winner 2')
         elif not self.player_1_turn and chipval != 2:
-            logging.error(str(chipval) + " - the chipVal for player 2")
             raise endpoints.NotFoundException(
                   'Wrong chip on this column, could not have been winner 3')
 
@@ -144,7 +133,7 @@ class Game(ndb.Model):
           return True;
     
     def check_win_direction(self, x, y, dx, dy, numberLeft, player, alreadyreversed=False):
-        logging.error(str(x)+ '_'+str(dx) +',' + str(y)+'_'+str(dy)+', '+str(numberLeft)+ '_'+str(player) + 'A? '+ str(alreadyreversed))
+        #logging.error(str(x)+ '_'+str(dx) +',' + str(y)+'_'+str(dy)+', '+str(numberLeft)+ '_'+str(player) + 'A? '+ str(alreadyreversed))
         if x+dx < 0 or x + dx > 6 or y+dy < 0 or y + dy > 6:
             return False
         if self.gamegrid[x + dx].row[y+dy] == player:
@@ -163,8 +152,8 @@ class Game(ndb.Model):
     def calc_points(self):
         # score is the total number of chips not used in the game. 
         score = 0
-        for aRow in self.gamegrid.row:
-            for item in aRow:
+        for aRow in self.gamegrid:
+            for item in aRow.row:
                 if item == 0:
                     score += 1
         return score
@@ -172,20 +161,20 @@ class Game(ndb.Model):
 
 class Score(ndb.Model):
     """Score object"""
-    user = ndb.KeyProperty(required=True, kind='User')
+    winner = ndb.KeyProperty(required=True, kind='User')
+    loser = ndb.KeyProperty(required=True, kind='User')
     date = ndb.DateProperty(required=True)
     won = ndb.BooleanProperty(required=True)
     points = ndb.IntegerProperty(required=True)
 
     def to_form(self):
-        return ScoreForm(user_name=self.user.get().name, won=self.won,
+        return ScoreForm(winner_name=self.winner.get().name, loser_name=self.loser.get().name, won=self.won,
                          date=str(self.date), points=self.points)
 
 
 class GameForm(messages.Message):
     """GameForm for outbound game state information"""
     urlsafe_key = messages.StringField(1, required=True)
-    attempts_remaining = messages.IntegerField(2, required=True)
     game_over = messages.BooleanField(3, required=True)
     message = messages.StringField(4, required=True)
     user1_name = messages.StringField(5, required=True)
@@ -199,14 +188,14 @@ class GameForm(messages.Message):
     user2_name = messages.StringField(13, required=True)
     game_winner = messages.StringField(14, required=False)
 
+class GameForms(messages.Message):
+    """Return multiple GameForms"""
+    items = messages.MessageField(GameForm, 1, repeated=True)
+
 class NewGameForm(messages.Message):
     """Used to create a new game"""
     user_1 = messages.StringField(1, required=True)
     user_2 = messages.StringField(2, required=True)
-    min = messages.IntegerField(3, default=1)
-    max = messages.IntegerField(4, default=10)
-    attempts = messages.IntegerField(5, default=5)
-
 
 class MakeMoveForm(messages.Message):
     """Used to make a move in an existing game"""
@@ -216,16 +205,24 @@ class MakeMoveForm(messages.Message):
 
 class ScoreForm(messages.Message):
     """ScoreForm for outbound Score information"""
-    user_name = messages.StringField(1, required=True)
-    date = messages.StringField(2, required=True)
-    won = messages.BooleanField(3, required=True)
-    points = messages.IntegerField(4, required=True)
+    winner_name = messages.StringField(1, required=True)
+    loser_name = messages.StringField(2, required=True)
+    date = messages.StringField(3, required=True)
+    won = messages.BooleanField(4, required=True)
+    points = messages.IntegerField(5, required=True)
 
 
 class ScoreForms(messages.Message):
     """Return multiple ScoreForms"""
     items = messages.MessageField(ScoreForm, 1, repeated=True)
 
+class UserRank(messages.Message):
+    user_name = messages.StringField(1, required=True)
+    wins = messages.IntegerField(3, required=True)
+    win_percent = messages.FloatField(4, required=True)
+
+class UserRanks(messages.Message):
+    items = messages.MessageField(UserRank, 1, repeated=True)
 
 class StringMessage(messages.Message):
     """StringMessage-- outbound (single) string message"""

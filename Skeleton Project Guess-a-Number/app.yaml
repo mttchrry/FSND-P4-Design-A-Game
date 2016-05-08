@@ -5,12 +5,12 @@ api_version: 1
 threadsafe: yes
 
 handlers:
+- url: /_ah/spi/.*
+  script: api.api
+
 - url: /favicon\.ico
   static_files: favicon.ico
   upload: favicon\.ico
-
-- url: /_ah/spi/.*
-  script: api.api
 
 - url: /tasks/cache_average_attempts
   script: main.app
