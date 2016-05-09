@@ -18,6 +18,18 @@ class User(ndb.Model):
 class Row(ndb.Model):
     row = ndb.IntegerProperty(repeated=True)
 
+class HistoricalRecord(ndb.Model):
+    player_name = ndb.StringProperty(required=True)
+    column = ndb.IntegerProperty(required=True)
+    game_state = ndb.StringProperty(required=True)
+
+    def to_form(self):
+        form = HistoryForm()
+        form.player_name = self.player_name
+        form.game_state = self.game_state
+        form.column = self.column
+        return form
+
 class Game(ndb.Model):
     """Game object"""
     gamegrid = ndb.LocalStructuredProperty(Row, repeated=True)
@@ -27,7 +39,7 @@ class Game(ndb.Model):
     user1 = ndb.KeyProperty(required=True, kind='User')
     user2 = ndb.KeyProperty(required=True, kind='User')
     player_1_turn = ndb.BooleanProperty(required=True, default=True)
-    game_history = ndb.StringProperty(repeated=True)
+    game_history = ndb.LocalStructuredProperty(HistoricalRecord, repeated=True)
     
     @classmethod
     def new_game(cls, user1, user2):
@@ -46,9 +58,8 @@ class Game(ndb.Model):
                     gamegrid = grid,
                     game_over=False)
         #Get rid of, just for quick end game tests
-        game.gamegrid[0].row[0] = 1
-        game.gamegrid[0].row[1] = 1
-        game.gamegrid[0].row[2] = 1
+        game.gamegrid[4].row[0] = 1
+        game.gamegrid[4].row[1] = 1
 
         game.put()
         return game
@@ -71,7 +82,7 @@ class Game(ndb.Model):
             for column in aRow.row:
                 listcolumn.append(column)
             setattr(form, rowField.name, listcolumn) 
-            logging.warning(listcolumn)
+            #logging.warning(listcolumn)
             index += 1
         if self.game_winner != None:
             form.game_winner = self.game_winner.get().name
@@ -87,7 +98,6 @@ class Game(ndb.Model):
             loser = self.user2
         self.put()
         # Add the game to the score 'board'
-        logging.error("did we get here?")
         points = self.calc_points()
         score = Score(winner=winner, loser=loser, date=date.today(), won=won,
                       points=points)
@@ -212,10 +222,18 @@ class ScoreForm(messages.Message):
     won = messages.BooleanField(4, required=True)
     points = messages.IntegerField(5, required=True)
 
-
 class ScoreForms(messages.Message):
     """Return multiple ScoreForms"""
     items = messages.MessageField(ScoreForm, 1, repeated=True)
+
+class HistoryForm(messages.Message):
+    player_name = messages.StringField(1, required=True)
+    game_state = messages.StringField(2, required=True)
+    column = messages.IntegerField(3, required=True)
+
+class HistoryForms(messages.Message):
+    """Return multiple GameForms"""
+    items = messages.MessageField(HistoryForm, 1, repeated=True)
 
 class UserRank(messages.Message):
     user_name = messages.StringField(1, required=True)

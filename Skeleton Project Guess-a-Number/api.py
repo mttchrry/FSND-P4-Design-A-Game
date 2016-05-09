@@ -14,7 +14,8 @@ from google.appengine.ext import ndb
 
 from models import User, Game, Score
 from models import StringMessage, NewGameForm, GameForm, MakeMoveForm,\
-    ScoreForms, GameForms, UserRank, UserRanks
+    ScoreForms, GameForms, UserRank, UserRanks, HistoricalRecord, \
+    HistoryForms, HistoryForms
 from utils import get_by_urlsafe
 
 NEW_GAME_REQUEST = endpoints.ResourceContainer(NewGameForm)
@@ -46,7 +47,7 @@ class Connect4Api(remote.Service):
                     'A User with that name already exists!')
         user = User(name=request.user_name, email=request.email)
         user.put()
-        return StringMessage(message='User {} created!'.format(
+        return StringMessage(message='User {} created.'.format(
                 request.user_name))
 
     @endpoints.method(request_message=NEW_GAME_REQUEST,
@@ -60,12 +61,12 @@ class Connect4Api(remote.Service):
         user2 = User.query(User.name == request.user_2).get()
         if not user1 or not user2:
             raise endpoints.NotFoundException(
-                    'A Users with those name do not exist!')
+                    'A Users with those names do not exist!')
         try:
             game = Game.new_game(user1.key, user2.key)
         except ValueError:
             raise endpoints.BadRequestException('Maximum must be greater '
-                                                'than minimum!')
+                                                'than minimum.')
 
         # Use a task queue to update the average attempts remaining.
         # This operation is not needed to complete the creation of a new game
@@ -83,9 +84,22 @@ class Connect4Api(remote.Service):
         """Return the current game state."""
         game = get_by_urlsafe(request.urlsafe_game_key, Game)
         if game:
-            return game.to_form('Time to make a move!')
+            return game.to_form('Time to make a move.')
         else:
-            raise endpoints.NotFoundException('Game not found!')
+            raise endpoints.NotFoundException('Game not found.')
+    
+    @endpoints.method(request_message=GET_GAME_REQUEST,
+                      response_message=HistoryForms,
+                      path='game_history/{urlsafe_game_key}',
+                      name='get_game_history',
+                      http_method='GET')
+    def get_game_history(self, request):
+        """Return the current game state."""
+        game = get_by_urlsafe(request.urlsafe_game_key, Game)
+        if game:
+            return HistoryForms(items=[history.to_form() for history in game.game_history])
+        else:
+            raise endpoints.NotFoundException('Game History not found.')
 
     @endpoints.method(request_message=GET_USER_GAMES_REQUEST,
                       response_message=GameForms,
@@ -97,7 +111,7 @@ class Connect4Api(remote.Service):
         user = User.query(User.name == request.user_name).get()
         if not user:
             raise endpoints.NotFoundException(
-                    'A Users with those name do not exist!')
+                    'A Users with those name do not exist.')
         gamesLeft = Game.query(ndb.AND(ndb.OR(Game.user1 == user.key, Game.user2 == user.key), 
             Game.game_over == False))
         return GameForms(items=[game.to_form("Open Game") for game in gamesLeft])
@@ -115,10 +129,10 @@ class Connect4Api(remote.Service):
                 raise endpoints.UnauthorizedException("Can't cancel completed game")
             else:
               game.key.delete()
-              return StringMessage(message='Game {} canceled and deleted!'.format(
+              return StringMessage(message='Game {} canceled and deleted.'.format(
                 request.urlsafe_game_key))
         else:
-            raise endpoints.NotFoundException('Game not found!')
+            raise endpoints.NotFoundException('Game not found.')
 
     @endpoints.method(request_message=MAKE_MOVE_REQUEST,
                       response_message=GameForm,
@@ -172,22 +186,22 @@ class Connect4Api(remote.Service):
                     'column is already full, pick another')
 
         current_player = game.user1.get().name
-        if !game.player_1_turn:
+        if not game.player_1_turn:
             current_player = game.user2.get().name
         if game.has_last_chip_won(request.column, endpoints):
-            game.game_history.append("Player {0} won with placement in {1}".format(
-                current_player, request.column))
+            history = HistoricalRecord(player_name=current_player, column=request.column, game_state="Just Won!")
+            game.game_history.append(history)
             game.end_game(user.key, True)
             msg = "Player {0} just won!".format(game.game_winner.get().name)
         elif game.calc_points() == 0:
             """there are no open spaces, tie game"""
-            game.game_history.append("Player {0} placed in Column {1}. No moves left,\
-               game over".format(current_player, request.column))
+            history = HistoricalRecord(player_name=current_player, column=request.column, game_state="Tie Game")
+            game.game_history.append(history)
             game.end_game()
             msg= "Game over, all spaces filled.  There are no winners here."
         else:
-            game.game_history.append("Player {0} placed in Column {1}. Next Player".format(
-                current_player, request.column))
+            history = HistoricalRecord(player_name=current_player, column=request.column, game_state="Next player's turn")
+            game.game_history.append(history)
             game.player_1_turn = not game.player_1_turn
             if game.player_1_turn:
                 msg = 'Player {0} is up next'.format(game.user1.get().name)
@@ -240,27 +254,6 @@ class Connect4Api(remote.Service):
         if request.max_number != None:
             rankings = rankings[0:request.max_number]
         return UserRanks(items=rankings)
-
-    @endpoints.method(response_message=StringMessage,
-                      path='games/average_attempts',
-                      name='get_average_attempts_remaining',
-                      http_method='GET')
-    def get_average_attempts(self, request):
-        """Get the cached average moves remaining"""
-        return StringMessage(message=memcache.get(MEMCACHE_MOVES_REMAINING) or '')
-
-    @staticmethod
-    def _cache_average_attempts():
-        """Populates memcache with the average moves remaining of Games"""
-        games = Game.query(Game.game_over == False).fetch()
-        if games:
-            count = len(games)
-            total_attempts_remaining = sum([game.attempts_remaining
-                                        for game in games])
-            average = float(total_attempts_remaining)/count
-            memcache.set(MEMCACHE_MOVES_REMAINING,
-                         'The average moves remaining is {:.2f}'.format(average))
-
-
+        
 
 api = endpoints.api_server([Connect4Api])
