@@ -1,22 +1,21 @@
-#Full Stack Nanodegree Project 4 Refresh
+#Full Stack Nanodegree Project 4 - Connect 4 games. 
 
-## Set-Up Instructions:
-1.  Update the value of application in app.yaml to the app ID you have registered
- in the App Engine admin console and would like to use to host your instance of this sample.
-1.  Run the app with the devserver using dev_appserver.py DIR, and ensure it's
- running by visiting the API Explorer - by default localhost:8080/_ah/api/explorer.
-1.  (Optional) Generate your client library(ies) with the endpoints tool.
- Deploy your application.
- 
- 
- 
 ##Game Description:
-Guess a number is a simple guessing game. Each game begins with a random 'target'
-number between the minimum and maximum values provided, and a maximum number of
-'attempts'. 'Guesses' are sent to the `make_move` endpoint which will reply
-with either: 'too low', 'too high', 'you win', or 'game over' (if the maximum
-number of attempts is reached).
-Many different Guess a Number games can be played by many different Users at any
+This is an implementation of the classic Connect 4 game, where each player 
+alternates dropping different colored chips (identified as 1's or 2's for our 
+purposes) into a 7x7 veritical grid, where the user can only choose a column 
+and the chip automatically falls to the lowest unoccupied space (represented 
+by a 0) Each game begins with a all spaces empty, and user1 goes first, 
+followed by user2, and alternating from there. 
+
+The winner is the first player to get 4 chips in a row, either virtically, 
+horizontally, or diagonally across the grid.  I'm alloting points based on the 
+number of unnoccupied spaces at the end of the game, so that winning in less 
+moves is rewarded more.  If there is no winner after a move, the message will 
+be who's turn is up next.  If the game is won, turns are no longer allowed, and
+the message congratulates the user name of the winner. 
+
+Many different Connect 4 games can be played by many different Users at any
 given time. Each game can be retrieved or played by using the path parameter
 `urlsafe_game_key`.
 
@@ -53,14 +52,41 @@ given time. Each game can be retrieved or played by using the path parameter
     - Parameters: urlsafe_game_key
     - Returns: GameForm with current game state.
     - Description: Returns the current state of a game.
+
+ - **get_game_history**
+    - Path: 'game_history/{urlsafe_game_key}'
+    - Method: GET
+    - Parameters: urlsafe_game_key
+    - Returns: HistoryForms of the current game
+    - Description: Returns the current history of moves taken in the game.
+    
+ - **get_user_games**
+    - Path: 'games/user/{user_name}'
+    - Method: GET
+    - Parameters: user_name
+    - Returns: GameForms for the user's games
+    - Description: Returns all active (not complete) games that include the 
+    given user.
+
+- **cancel_game**
+    - Path: 'game_history/{urlsafe_game_key}'
+    - Method: PUT
+    - Parameters: urlsafe_game_key
+    - Returns: Message confirming cancelling of the game.
+    - Description: Cancels and deletes the game
     
  - **make_move**
     - Path: 'game/{urlsafe_game_key}'
     - Method: PUT
-    - Parameters: urlsafe_game_key, guess
+    - Parameters: urlsafe_game_key, user_name, column
     - Returns: GameForm with new game state.
-    - Description: Accepts a 'guess' and returns the updated state of the game.
-    If this causes a game to end, a corresponding Score entity will be created.
+    - Description: Accepts a column from the user and returns the updated state
+    of the game. A history of the turn is logged on the game. If this causes a 
+    game to end, a corresponding Score entity will be created.  If the user 
+    isn't in the database, an exception stating such is returned.  If it is not 
+    the given users turn, again an exception stating such is returned. If the 
+    given column is not between 0 and 6, a BadRequestException is raised.  If the 
+    column given is full, a ConflictException is raised. 
     
  - **get_scores**
     - Path: 'scores'
@@ -76,14 +102,15 @@ given time. Each game can be retrieved or played by using the path parameter
     - Returns: ScoreForms. 
     - Description: Returns all Scores recorded by the provided player (unordered).
     Will raise a NotFoundException if the User does not exist.
-    
- - **get_active_game_count**
-    - Path: 'games/active'
+
+ - **get_user_rankings**
+    - Path: 'rankings'
     - Method: GET
-    - Parameters: None
-    - Returns: StringMessage
-    - Description: Gets the average number of attempts remaining for all games
-    from a previously cached memcache key.
+    - Parameters: max_number
+    - Returns: UserRanks. 
+    - Description: Returns the rankings of the users in order from most wins to
+    least.  Optionally it takes a parameter max_number to limit the number of 
+    rankings returned
 
 ##Models Included:
  - **User**
@@ -99,6 +126,18 @@ given time. Each game can be retrieved or played by using the path parameter
  - **GameForm**
     - Representation of a Game's state (urlsafe_key, attempts_remaining,
     game_over flag, message, user_name).
+ - **NewGameForm**
+    - Used to create a new game (user1_name, user2_name)
+ - **MakeMoveForm**
+    - Inbound make move form (guess).
+ - **ScoreForm**
+    - Representation of a completed game's Score (winner, loser, date, wonflag,
+    points).
+ - **ScoreForms**
+    - Multiple ScoreForm container.
+ - **StringMessage**
+    - General purpose String container.
+
  - **NewGameForm**
     - Used to create a new game (user_name, min, max, attempts)
  - **MakeMoveForm**

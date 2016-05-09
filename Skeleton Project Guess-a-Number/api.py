@@ -28,12 +28,15 @@ MAKE_MOVE_REQUEST = endpoints.ResourceContainer(
     urlsafe_game_key=messages.StringField(1),)
 USER_REQUEST = endpoints.ResourceContainer(user_name=messages.StringField(1),
                                            email=messages.StringField(2))
-USER_RANKINGS = endpoints.ResourceContainer(max_number = messages.IntegerField(1))
+USER_RANKINGS = endpoints.ResourceContainer(
+    max_number=messages.IntegerField(1))
 
 MEMCACHE_MOVES_REMAINING = 'MOVES_REMAINING'
 
+
 @endpoints.api(name='connect_four', version='v1')
 class Connect4Api(remote.Service):
+
     """Game API"""
     @endpoints.method(request_message=USER_REQUEST,
                       response_message=StringMessage,
@@ -44,11 +47,11 @@ class Connect4Api(remote.Service):
         """Create a User. Requires a unique username"""
         if User.query(User.name == request.user_name).get():
             raise endpoints.ConflictException(
-                    'A User with that name already exists!')
+                'A User with that name already exists!')
         user = User(name=request.user_name, email=request.email)
         user.put()
         return StringMessage(message='User {} created.'.format(
-                request.user_name))
+            request.user_name))
 
     @endpoints.method(request_message=NEW_GAME_REQUEST,
                       response_message=GameForm,
@@ -61,7 +64,7 @@ class Connect4Api(remote.Service):
         user2 = User.query(User.name == request.user_2).get()
         if not user1 or not user2:
             raise endpoints.NotFoundException(
-                    'A Users with those names do not exist!')
+                'A Users with those names do not exist!')
         try:
             game = Game.new_game(user1.key, user2.key)
         except ValueError:
@@ -72,8 +75,8 @@ class Connect4Api(remote.Service):
         # This operation is not needed to complete the creation of a new game
         # so it is performed out of sequence.
         taskqueue.add(url='/tasks/cache_average_attempts')
-        return game.to_form('Good luck playing Connect Four! Player {0} goes first'.
-            format(user1.name))
+        return game.to_form('Good luck playing Connect Four! Player {0} \
+        goes first'.format(user1.name))
 
     @endpoints.method(request_message=GET_GAME_REQUEST,
                       response_message=GameForm,
@@ -87,7 +90,7 @@ class Connect4Api(remote.Service):
             return game.to_form('Time to make a move.')
         else:
             raise endpoints.NotFoundException('Game not found.')
-    
+
     @endpoints.method(request_message=GET_GAME_REQUEST,
                       response_message=HistoryForms,
                       path='game_history/{urlsafe_game_key}',
@@ -97,7 +100,8 @@ class Connect4Api(remote.Service):
         """Return the current game state."""
         game = get_by_urlsafe(request.urlsafe_game_key, Game)
         if game:
-            return HistoryForms(items=[history.to_form() for history in game.game_history])
+            return HistoryForms(
+                items=[history.to_form() for history in game.game_history])
         else:
             raise endpoints.NotFoundException('Game History not found.')
 
@@ -111,10 +115,12 @@ class Connect4Api(remote.Service):
         user = User.query(User.name == request.user_name).get()
         if not user:
             raise endpoints.NotFoundException(
-                    'A Users with those name do not exist.')
-        gamesLeft = Game.query(ndb.AND(ndb.OR(Game.user1 == user.key, Game.user2 == user.key), 
-            Game.game_over == False))
-        return GameForms(items=[game.to_form("Open Game") for game in gamesLeft])
+                'A Users with those name do not exist.')
+        gamesLeft = Game.query(ndb.AND(ndb.OR(Game.user1 == user.key,
+                                              Game.user2 == user.key),
+                                       Game.game_over == False))
+        return GameForms(
+            items=[game.to_form("Open Game") for game in gamesLeft])
 
     @endpoints.method(request_message=GET_GAME_REQUEST,
                       response_message=StringMessage,
@@ -126,11 +132,12 @@ class Connect4Api(remote.Service):
         game = get_by_urlsafe(request.urlsafe_game_key, Game)
         if game:
             if game.game_over:
-                raise endpoints.UnauthorizedException("Can't cancel completed game")
+                raise endpoints.UnauthorizedException(
+                    "Can't cancel completed game")
             else:
-              game.key.delete()
-              return StringMessage(message='Game {} canceled and deleted.'.format(
-                request.urlsafe_game_key))
+                game.key.delete()
+                return StringMessage(message='Game {} canceled and deleted.'.
+                                     format(request.urlsafe_game_key))
         else:
             raise endpoints.NotFoundException('Game not found.')
 
@@ -148,27 +155,28 @@ class Connect4Api(remote.Service):
         user = User.query(User.name == request.user).get()
         if not user:
             raise endpoints.NotFoundException(
-                    'A Users with those name do not exist!')
+                'A Users with those name do not exist!')
+
         # handle all incorrect turn attempts or users not in the game
         if game.player_1_turn and user.key != game.user1:
             if user.key != game.user2:
                 raise endpoints.NotFoundException(
                     'User not in this game')
             else:
-                raise endpoints.NotFoundException(
+                raise endpoints.ConflictException(
                     'Not your turn')
         elif not game.player_1_turn and user.key != game.user2:
             if user.key != game.user1:
                 raise endpoints.NotFoundException(
                     'User not in this game')
             else:
-                raise endpoints.NotFoundException(
+                raise endpoints.ConflictException(
                     'Not your turn')
 
         # Make sure user picked a valid column.
         if request.column < 0 or request.column > 6:
-            raise endpoints.NotFoundException(
-                    'Must select a column between 0 and 6')
+            raise endpoints.BadRequestException(
+                'Must select a column between 0 and 6')
 
         # player 1 chip is 1, player 2 chip is 2.
         playerChip = 0
@@ -178,29 +186,33 @@ class Connect4Api(remote.Service):
             playerChip = 2
 
         for idx, val in enumerate(game.gamegrid[request.column].row):
-          if val == 0:
-            game.gamegrid[request.column].row[idx] = playerChip
-            break
-          elif idx == 6:
-            raise endpoints.NotFoundException(
+            if val == 0:
+                game.gamegrid[request.column].row[idx] = playerChip
+                break
+            elif idx == 6:
+                raise endpoints.ConflictException(
                     'column is already full, pick another')
 
-        current_player = game.user1.get().name
-        if not game.player_1_turn:
-            current_player = game.user2.get().name
         if game.has_last_chip_won(request.column, endpoints):
-            history = HistoricalRecord(player_name=current_player, column=request.column, game_state="Just Won!")
+            history = HistoricalRecord(
+                player_name=user.name, column=request.column,
+                game_state="Just Won!")
             game.game_history.append(history)
             game.end_game(user.key, True)
-            msg = "Player {0} just won!".format(game.game_winner.get().name)
-        elif game.calc_points() == 0:
+            msg = "Player {0} just won!".format(user.name)
+        # Re-using spaces_left
+        elif game.spaces_left() == 0:
             """there are no open spaces, tie game"""
-            history = HistoricalRecord(player_name=current_player, column=request.column, game_state="Tie Game")
+            history = HistoricalRecord(
+                player_name=user.name, column=request.column,
+                game_state="Tie Game")
             game.game_history.append(history)
             game.end_game()
-            msg= "Game over, all spaces filled.  There are no winners here."
+            msg = "Game over, all spaces filled.  There are no winners here."
         else:
-            history = HistoricalRecord(player_name=current_player, column=request.column, game_state="Next player's turn")
+            history = HistoricalRecord(
+                player_name=user.name, column=request.column,
+                game_state="Next player's turn")
             game.game_history.append(history)
             game.player_1_turn = not game.player_1_turn
             if game.player_1_turn:
@@ -229,8 +241,9 @@ class Connect4Api(remote.Service):
         user = User.query(User.name == request.user_name).get()
         if not user:
             raise endpoints.NotFoundException(
-                    'A User with that name does not exist!')
-        scores = Score.query(ndb.OR(Score.loser == user.key, Score.winner == user.key))
+                'A User with that name does not exist!')
+        scores = Score.query(
+            ndb.OR(Score.loser == user.key, Score.winner == user.key))
         return ScoreForms(items=[score.to_form() for score in scores])
 
     @endpoints.method(request_message=USER_RANKINGS,
@@ -239,21 +252,26 @@ class Connect4Api(remote.Service):
                       name='get_user_rankings',
                       http_method='GET')
     def get_user_rankings(self, request):
-        """Returns the user rankins, sorted by highest first, up to number indicated"""
+        """Returns the user rankings, sorted by highest first, up to number
+         indicated"""
         users = User.query()
         rankings = []
         for user in users:
-            totalScores = Score.query(ndb.OR(Score.loser == user.key, Score.winner == user.key))
-            winningScores = Score.query(ndb.AND(Score.winner == user.key, Score.won == True))
-            winP = 0.0;
-            if totalScores.count()>0:
+            totalScores = Score.query(
+                ndb.OR(Score.loser == user.key, Score.winner == user.key))
+            winningScores = Score.query(
+                ndb.AND(Score.winner == user.key, Score.won == True))
+            winP = 0.0
+            if totalScores.count() > 0:
                 winP = winningScores.count()/float(totalScores.count())
-            userRank = UserRank(user_name=user.name, wins=winningScores.count(), win_percent=winP)
+            userRank = UserRank(
+                user_name=user.name, wins=winningScores.count(),
+                win_percent=winP)
             rankings.append(userRank)
         sorted(rankings, key=lambda UserRank: UserRank.wins, reverse=True)
         if request.max_number != None:
             rankings = rankings[0:request.max_number]
         return UserRanks(items=rankings)
-        
+
 
 api = endpoints.api_server([Connect4Api])
