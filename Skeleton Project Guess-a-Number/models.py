@@ -27,7 +27,8 @@ class Game(ndb.Model):
     user1 = ndb.KeyProperty(required=True, kind='User')
     user2 = ndb.KeyProperty(required=True, kind='User')
     player_1_turn = ndb.BooleanProperty(required=True, default=True)
-
+    game_history = ndb.StringProperty(repeated=True)
+    
     @classmethod
     def new_game(cls, user1, user2):
         """Creates and returns a new game"""

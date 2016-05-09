@@ -170,14 +170,24 @@ class Connect4Api(remote.Service):
           elif idx == 6:
             raise endpoints.NotFoundException(
                     'column is already full, pick another')
+
+        current_player = game.user1.get().name
+        if !game.player_1_turn:
+            current_player = game.user2.get().name
         if game.has_last_chip_won(request.column, endpoints):
+            game.game_history.append("Player {0} won with placement in {1}".format(
+                current_player, request.column))
             game.end_game(user.key, True)
             msg = "Player {0} just won!".format(game.game_winner.get().name)
         elif game.calc_points() == 0:
             """there are no open spaces, tie game"""
+            game.game_history.append("Player {0} placed in Column {1}. No moves left,\
+               game over".format(current_player, request.column))
             game.end_game()
             msg= "Game over, all spaces filled.  There are no winners here."
         else:
+            game.game_history.append("Player {0} placed in Column {1}. Next Player".format(
+                current_player, request.column))
             game.player_1_turn = not game.player_1_turn
             if game.player_1_turn:
                 msg = 'Player {0} is up next'.format(game.user1.get().name)
