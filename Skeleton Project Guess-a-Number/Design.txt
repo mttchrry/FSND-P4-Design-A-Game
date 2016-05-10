@@ -1,0 +1,48 @@
+# Design.txt
+
+I added a few different properties to my model in order to make the game 
+work.  
+	GAME:
+	-  The first that became abundantly clear that I needed was a 
+	game_grid object to represent the current game state for a 7x7 connect 
+	4 game.  I researched how to implement this, learning about the 	LocalStructuredProperty of ndb.Model, so I could create a repeated 
+	field of a repeated field, at the expense of being able to query.  
+	That was a fine trade-off as currently there is no requirement that
+	would be be helped by executing such a query, but it was something I 
+	needed to analyze to ensure.  The grid would further be represented by
+	integers, a 0 being an empty slot, a 1 accounting for player 1's chip,
+	and 2 being a player 2's chip.
+	-  I also needed a Historical Record item to keep track of the game
+	history. It just needed the player name, and what column they placed
+	in, as well as if they won on that turn, caused a tie, or just got on 
+	with the next turn.  Also a convenient function to convert it to a 
+	Form was useful in displaying the historical results. 
+	-  The rest of the properties for the game were simpler - user1 
+	(always goes first), user2, game_winner, were all of the User type 
+	we've seen in our classroom.  Then there were boolean flages for
+	game_over, and player_1_turn.  And finally the Game Model needed a 
+	score field, where I came up with the amount of chips left in the 
+	game when it was won would be the score. 
+
+	SCORE: 
+	- This just needed simple properties for who was the winner, loser, 
+	the date of the game, whether it was won, (a false indicates tie, in
+	which case the winner/loser distinction is meaningless), and the score
+	of the game. It also needed a to_form method for displaying. 
+
+Other logical difficulties in completing this project revolved around 
+calculating a win.  I first was daunted by the idea that I'd have to check 
+every possible combination on the board to see if there was a winning 
+pattern.  I soon realized however that for any sequential win, the last
+chip placed would have to be part of the winning 4, so I would only need 
+to check around it, thus creating the has_last_chip_won method.  At first
+I just figured I'd use some grid traversing in the various 7 directions 
+(couldn't be any chips above) and see if there were 3 in a row, but then 
+remembered the last chip placed could be in the middle of 4 in a row.  So 
+I had it backtrack after finding a non matching chip, looking in the 
+opposite direction while keeping track of how many to go. 
+
+One last thing that kind of bugged me that I didn't get sorted out was how 
+to print the grid in a better manner when returned to the form.  Its not 
+entirely necassary, but getting the columns back in a long vertical list 
+that is unordered no less, makes it a bit arduous to debug win conditions.
