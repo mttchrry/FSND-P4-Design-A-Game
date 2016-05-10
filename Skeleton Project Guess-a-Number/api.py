@@ -186,6 +186,8 @@ class Connect4Api(remote.Service):
             playerChip = 2
 
         for idx, val in enumerate(game.gamegrid[request.column].row):
+            # replace the lowest unoccupied space(indicated by a 0) 
+            # with the current chip.
             if val == 0:
                 game.gamegrid[request.column].row[idx] = playerChip
                 break
@@ -194,15 +196,15 @@ class Connect4Api(remote.Service):
                     'column is already full, pick another')
 
         if game.has_last_chip_won(request.column, endpoints):
+            # Player just won, end game accordingly
             history = HistoricalRecord(
                 player_name=user.name, column=request.column,
                 game_state="Just Won!")
             game.game_history.append(history)
             game.end_game(user.key, True)
             msg = "Player {0} just won!".format(user.name)
-        # Re-using spaces_left
         elif game.spaces_left() == 0:
-            """there are no open spaces, tie game"""
+            # there are no open spaces, tie game
             history = HistoricalRecord(
                 player_name=user.name, column=request.column,
                 game_state="Tie Game")
@@ -210,6 +212,7 @@ class Connect4Api(remote.Service):
             game.end_game()
             msg = "Game over, all spaces filled.  There are no winners here."
         else:
+            # normal turn, next players turn. 
             history = HistoricalRecord(
                 player_name=user.name, column=request.column,
                 game_state="Next player's turn")

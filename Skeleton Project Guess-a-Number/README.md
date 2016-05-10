@@ -121,15 +121,23 @@ given time. Each game can be retrieved or played by using the path parameter
     
  - **Score**
     - Records completed games. Associated with Users model via KeyProperty.
+
+ - **Column**
+    - A column of rows for the game.  Not its own database entity, included in
+    Game.
+
+ - **HistoricalRecord**
+    - A recording a players turn and its result. Not its own database entity,
+     included in Game.
     
 ##Forms Included:
  - **GameForm**
-    - Representation of a Game's state (urlsafe_key, attempts_remaining,
+    - Representation of a Game's state (urlsafe_key, user1_name, user2_name,
     game_over flag, message, user_name).
  - **NewGameForm**
     - Used to create a new game (user1_name, user2_name)
  - **MakeMoveForm**
-    - Inbound make move form (guess).
+    - Inbound make move form (column, user_name).
  - **ScoreForm**
     - Representation of a completed game's Score (winner, loser, date, wonflag,
     points).
@@ -137,15 +145,13 @@ given time. Each game can be retrieved or played by using the path parameter
     - Multiple ScoreForm container.
  - **StringMessage**
     - General purpose String container.
-
- - **NewGameForm**
-    - Used to create a new game (user_name, min, max, attempts)
- - **MakeMoveForm**
-    - Inbound make move form (guess).
- - **ScoreForm**
-    - Representation of a completed game's Score (user_name, date, won flag,
-    guesses).
- - **ScoreForms**
-    - Multiple ScoreForm container.
- - **StringMessage**
-    - General purpose String container.
+ - **HistoricalForm**
+    - Representation of a move made in a game
+ - **HistoricalForms**
+    - Representation of all moves made in a game
+ - **UserRank**
+    - Number of wins and win percentage for a user
+ - **UserRanks**
+    - Sorted list of all UserRank, or the top number of players equal to 
+    the option max_number
+ 
