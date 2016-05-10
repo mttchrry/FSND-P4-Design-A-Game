@@ -56,6 +56,8 @@ class Game(ndb.Model):
                 emptyColumn,
                 emptyColumn,
                 emptyColumn]
+        if user1 == user2:
+            raise ValueError;
         game = Game(user1=user1,
                     user2=user2,
                     gamegrid=grid,
@@ -141,24 +143,24 @@ class Game(ndb.Model):
         if self.check_win_direction(column, lastUsedIndex, 0, -1, 3, chipval):
             return True
 
-    def check_win_direction(self, x, y, dx, dy, numberLeft, player,
+    def check_win_direction(self, x, y, dx, dy, number_left, player,
                             alreadyreversed=False):
-        #logging.error(str(x)+ '_'+str(dx) +',' + str(y)+'_'+str(dy)+', '+str(numberLeft)+ '_'+str(player) + 'A? '+ str(alreadyreversed))
-        if x+dx < 0 or x + dx > 6 or y+dy < 0 or y + dy > 6:
-            return False
-        if self.gamegrid[x + dx].row[y+dy] == player:
-            if numberLeft == 1:
+        logging.error(str(x)+ '_'+str(dx) +',' + str(y)+'_'+str(dy)+', '+str(number_left)+ '_'+str(player) + 'A? '+ str(alreadyreversed))
+        
+        end_of_grid = (x+dx < 0 or x + dx > 6 or y+dy < 0 or y + dy > 6)
+        if not end_of_grid and self.gamegrid[x + dx].row[y+dy] == player:
+            if number_left == 1:
                 return True
             else:
-                numberLeft -= 1
+                number_left -= 1
                 return self.check_win_direction(
-                    x+dx, y+dy, dx, dy, numberLeft, player, alreadyreversed)
+                    x+dx, y+dy, dx, dy, number_left, player, alreadyreversed)
         elif alreadyreversed == False:
             alreadyreversed = True
-            numberGone = 3-numberLeft
-            return self.check_win_direction(x-(dx*numberGone),
-                                            y-(dy*numberGone), -dx, 
-                                            -dy, numberLeft, player,
+            number_gone = 3-number_left
+            return self.check_win_direction(x-(dx*number_gone),
+                                            y-(dy*number_gone), -dx, 
+                                            -dy, number_left, player,
                                             alreadyreversed)
         else:
             return False

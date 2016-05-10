@@ -5,17 +5,15 @@ move game logic to another file. Ideally the API will be simple, concerned
 primarily with communication to/from the API's users."""
 
 
-import logging
 import endpoints
 from protorpc import remote, messages
-from google.appengine.api import memcache
 from google.appengine.api import taskqueue
 from google.appengine.ext import ndb
 
 from models import User, Game, Score
 from models import StringMessage, NewGameForm, GameForm, MakeMoveForm,\
     ScoreForms, GameForms, UserRank, UserRanks, HistoricalRecord, \
-    HistoryForms, HistoryForms
+    HistoryForms
 from utils import get_by_urlsafe
 
 NEW_GAME_REQUEST = endpoints.ResourceContainer(NewGameForm)
@@ -68,8 +66,7 @@ class Connect4Api(remote.Service):
         try:
             game = Game.new_game(user1.key, user2.key)
         except ValueError:
-            raise endpoints.BadRequestException('Maximum must be greater '
-                                                'than minimum.')
+            raise endpoints.BadRequestException('User cannot play himself.')
 
         # Use a task queue to update the average attempts remaining.
         # This operation is not needed to complete the creation of a new game
@@ -116,17 +113,17 @@ class Connect4Api(remote.Service):
         if not user:
             raise endpoints.NotFoundException(
                 'A Users with those name do not exist.')
-        gamesLeft = Game.query(ndb.AND(ndb.OR(Game.user1 == user.key,
+        games_left = Game.query(ndb.AND(ndb.OR(Game.user1 == user.key,
                                               Game.user2 == user.key),
                                        Game.game_over == False))
         return GameForms(
-            items=[game.to_form("Open Game") for game in gamesLeft])
+            items=[game.to_form("Open Game") for game in games_left])
 
     @endpoints.method(request_message=GET_GAME_REQUEST,
                       response_message=StringMessage,
                       path='cancel/game/{urlsafe_game_key}',
                       name='cancel_game',
-                      http_method='PUT')
+                      http_method='DELETE')
     def cancel_game(self, request):
         """Cancel the current game state."""
         game = get_by_urlsafe(request.urlsafe_game_key, Game)
@@ -179,17 +176,13 @@ class Connect4Api(remote.Service):
                 'Must select a column between 0 and 6')
 
         # player 1 chip is 1, player 2 chip is 2.
-        playerChip = 0
-        if game.player_1_turn:
-            playerChip = 1
-        else:
-            playerChip = 2
+        player_chip = 1 if game.player_1_turn else 2
 
         for idx, val in enumerate(game.gamegrid[request.column].row):
             # replace the lowest unoccupied space(indicated by a 0) 
             # with the current chip.
             if val == 0:
-                game.gamegrid[request.column].row[idx] = playerChip
+                game.gamegrid[request.column].row[idx] = player_chip
                 break
             elif idx == 6:
                 raise endpoints.ConflictException(
@@ -260,16 +253,16 @@ class Connect4Api(remote.Service):
         users = User.query()
         rankings = []
         for user in users:
-            totalScores = Score.query(
+            total_scores = Score.query(
                 ndb.OR(Score.loser == user.key, Score.winner == user.key))
-            winningScores = Score.query(
+            winning_scores = Score.query(
                 ndb.AND(Score.winner == user.key, Score.won == True))
-            winP = 0.0
+            win_p = 0.0
             if totalScores.count() > 0:
-                winP = winningScores.count()/float(totalScores.count())
+                win_p = winning_scores.count()/float(total_scores.count())
             userRank = UserRank(
-                user_name=user.name, wins=winningScores.count(),
-                win_percent=winP)
+                user_name=user.name, wins=winning_scores.count(),
+                win_percent=win_p)
             rankings.append(userRank)
         sorted(rankings, key=lambda UserRank: UserRank.wins, reverse=True)
         if request.max_number != None:
