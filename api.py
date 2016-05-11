@@ -258,7 +258,7 @@ class Connect4Api(remote.Service):
             winning_scores = Score.query(
                 ndb.AND(Score.winner == user.key, Score.won == True))
             win_p = 0.0
-            if totalScores.count() > 0:
+            if total_scores.count() > 0:
                 win_p = winning_scores.count()/float(total_scores.count())
             userRank = UserRank(
                 user_name=user.name, wins=winning_scores.count(),

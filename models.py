@@ -145,7 +145,8 @@ class Game(ndb.Model):
 
     def check_win_direction(self, x, y, dx, dy, number_left, player,
                             alreadyreversed=False):
-        logging.error(str(x)+ '_'+str(dx) +',' + str(y)+'_'+str(dy)+', '+str(number_left)+ '_'+str(player) + 'A? '+ str(alreadyreversed))
+        logging.info(str(x)+ '_'+str(dx) +',' + str(y)+'_'+str(dy)+', '+
+            str(number_left)+ '_'+str(player) + 'A? '+ str(alreadyreversed))
         
         end_of_grid = (x+dx < 0 or x + dx > 6 or y+dy < 0 or y + dy > 6)
         if not end_of_grid and self.gamegrid[x + dx].row[y+dy] == player:
